@@ -1,0 +1,5 @@
+{
+  "name": "Phishing Email Detector",
+  "description": "An AI-powered tool to scan email content for signs of phishing, scams, or malicious intent. Paste an email's content to receive a probability score, risk level, and a detailed breakdown of suspicious elements.",
+  "requestFramePermissions": []
+}
