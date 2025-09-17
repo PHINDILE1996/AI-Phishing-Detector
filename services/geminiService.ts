@@ -1,20 +1,38 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Declare ai client, but do not initialize it here.
+let ai: GoogleGenAI | null = null;
 
-export const analyzeEmailContent = async (emailText: string): Promise<AnalysisResult> => {
+// A function to get the initialized client, creating it on first call.
+const getAiClient = (): GoogleGenAI => {
+  if (ai) {
+    return ai;
+  }
+
+  // Check for the API key at the moment it's needed, not on module load.
   if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set.");
+    // This error is caught and displayed in the UI, so it should be user-friendly
+    // and not expose implementation details like "API_KEY".
+    throw new Error("The analysis service is not configured. Please contact the administrator.");
   }
   
+  // Initialize the client and store it for subsequent calls.
+  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return ai;
+};
+
+
+export const analyzeEmailContent = async (emailText: string): Promise<AnalysisResult> => {
   if (!emailText.trim()) {
     throw new Error("Email content cannot be empty.");
   }
 
   try {
-    const response = await ai.models.generateContent({
+    // Get the client. This will throw the configuration error if the key is missing.
+    const genAI = getAiClient();
+    
+    const response = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Analyze the following email content for any signs of phishing, scams, or malicious intent. Provide a detailed analysis based on the schema. Email Content: --- ${emailText} ---`,
       config: {
@@ -63,7 +81,12 @@ export const analyzeEmailContent = async (emailText: string): Promise<AnalysisRe
   } catch (error) {
     console.error("Error analyzing email content with Gemini API:", error);
     if (error instanceof Error) {
-        throw new Error(`Failed to analyze email. Gemini API error: ${error.message}`);
+        // If it's our custom config error, re-throw it as is.
+        if (error.message.startsWith("The analysis service is not configured")) {
+            throw error;
+        }
+        // For other errors from the API or JSON parsing, provide a generic message.
+        throw new Error(`Failed to analyze email. The service may be temporarily unavailable or the input is invalid.`);
     }
     throw new Error("An unknown error occurred while analyzing the email.");
   }
